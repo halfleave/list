@@ -83,8 +83,9 @@ body{
 }
 @media (max-width:540px){
   body{display:block; background:var(--bg)}
-  /* fixed 定位铺满视口：彻底消除 iOS 橡皮筋滚动露出的白边 */
-  .phone{position:fixed; inset:0; width:100%; height:auto; border-radius:0; box-shadow:none}
+  /* fixed + 实时可视视口高度（--vvh 由 JS 更新）：
+     底栏收起/展开时容器实时跟随，避免新露出区域闪白条 */
+  .phone{position:fixed; top:0; left:0; right:0; height:var(--vvh, 100dvh); border-radius:0; box-shadow:none}
   .screen::before{display:none}
 }
 
@@ -421,7 +422,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 21;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 22;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
@@ -904,6 +905,15 @@ document.addEventListener('visibilitychange', function(){
 });
 
 /* ===== 初始化 ===== */
+/* 实时跟踪可视视口高度：Safari 底栏收起/展开、键盘弹出都即时贴合 */
+function fitViewport(){
+  var h = window.visualViewport ? Math.round(visualViewport.height) : window.innerHeight;
+  document.documentElement.style.setProperty('--vvh', h + 'px');
+}
+if(window.visualViewport) visualViewport.addEventListener('resize', fitViewport);
+window.addEventListener('resize', fitViewport);
+window.addEventListener('orientationchange', function(){ setTimeout(fitViewport, 100); });
+fitViewport();
 document.getElementById('verTag').textContent = 'v0.' + APP_VER;   /* 标题旁显示版本号 */
 load();
 render();
