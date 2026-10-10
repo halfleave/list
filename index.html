@@ -2,6 +2,9 @@
 <html lang="zh-CN" data-mode="light">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -412,6 +415,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
+var APP_VER = 17;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
@@ -874,6 +878,24 @@ document.addEventListener('touchstart', function(e){
   document.addEventListener(ev, function(){ clearTimeout(pressTimer); }, {passive:true});
 });
 var pressTimer = 0;
+
+/* ===== 版本缓存检查：线上有新版自动刷新 ===== */
+function checkUpdate(){
+  if(location.protocol !== 'http:' && location.protocol !== 'https:') return;  /* 本地 file 预览跳过 */
+  fetch(location.href.split('#')[0] + (location.search ? '&' : '?') + '_v=' + Date.now(), {cache:'no-store'})
+    .then(function(r){ return r.text(); })
+    .then(function(html){
+      var m = html.match(/APP_VER\s*=\s*(\d+)/);
+      if(m && +m[1] !== APP_VER){
+        toast('发现新版本，正在更新…');
+        setTimeout(function(){ location.replace(location.pathname + '?v=' + Date.now()); }, 1200);
+      }
+    }).catch(function(){});
+}
+checkUpdate();
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden) checkUpdate();   /* 切回 App 时也检查一次 */
+});
 
 /* ===== 初始化 ===== */
 load();
