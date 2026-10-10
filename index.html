@@ -60,9 +60,9 @@
 /* 隐藏所有滚动条 */
 *{-ms-overflow-style:none; scrollbar-width:none}
 *::-webkit-scrollbar{display:none; width:0; height:0}
-/* html 也要有背景色，否则 iOS 橡皮筋回弹时底部露出白条 */
+/* html 也要有背景色，否则 iOS 橡皮筋回弹/视口切换时底部露出异色条 */
 html{background:#F6F5F2; overscroll-behavior:none}
-@media (prefers-color-scheme: dark){ html{background:#000} }
+@media (prefers-color-scheme: dark){ html{background:#171613} }
 html,body{height:100%}
 body{
   font-family:var(--sans); background:#E9E7E2; color:var(--ink);
@@ -87,6 +87,10 @@ body{
      底栏收起/展开时容器实时跟随，避免新露出区域闪白条 */
   .phone{position:fixed; top:0; left:0; right:0; height:var(--vvh, 100dvh); border-radius:0; box-shadow:none}
   .screen::before{display:none}
+}
+/* 主屏幕模式：根元素背景与页面严格同色，任何系统级缝隙都不可见 */
+@media (display-mode: standalone){
+  html, body{background:var(--bg)}
 }
 
 /* ===== 双 Tab 页 ===== */
@@ -422,7 +426,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 23;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 24;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
