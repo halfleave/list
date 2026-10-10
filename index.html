@@ -276,11 +276,16 @@ body{
 }
 .sheet, .edit-sheet{
   position:absolute; left:8px; right:8px; bottom:calc(env(safe-area-inset-bottom, 0px) + 8px);
-  z-index:41; transform:translateY(110%); transition:transform .3s cubic-bezier(.32,.72,.35,1);
+  z-index:41; transform:translateY(110%); opacity:0; pointer-events:none; visibility:hidden;
+  transition:transform .3s cubic-bezier(.32,.72,.35,1), opacity .25s, visibility 0s linear .3s;
 }
-.sheet.show, .edit-sheet.show, .sheet-mask.show{opacity:1}
-.sheet-mask.show{pointer-events:auto}
-.sheet.show, .edit-sheet.show{transform:translateY(0)}
+/* 注意：仅靠 translateY(110%) 在有底部安全区的真机上会露出 ~20px 顶边，
+   必须叠加 opacity/visibility 才能彻底隐藏 */
+.sheet.show, .edit-sheet.show{
+  transform:translateY(0); opacity:1; pointer-events:auto; visibility:visible;
+  transition:transform .3s cubic-bezier(.32,.72,.35,1), opacity .25s;
+}
+.sheet-mask.show{opacity:1; pointer-events:auto}
 .sheet .sheet-group{background:rgba(249,249,249,.94); backdrop-filter:blur(20px);
   border-radius:14px; overflow:hidden; margin-bottom:8px}
 .sheet button{
@@ -426,7 +431,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 25;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 26;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
