@@ -426,7 +426,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 24;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 25;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
@@ -918,6 +918,40 @@ if(window.visualViewport) visualViewport.addEventListener('resize', fitViewport)
 window.addEventListener('resize', fitViewport);
 window.addEventListener('orientationchange', function(){ setTimeout(fitViewport, 100); });
 fitViewport();
+
+/* ===== iOS standalone 键盘视口 Bug 自愈 =====
+   键盘弹出会压缩 WebKit 视口画布，收起后画布卡在小尺寸回不去，
+   底部留下白条（键盘背景）。社区验证解法：键盘收起后把全屏容器
+   display 隐藏→强制回流→恢复，逼 WebKit 重新测量画布。 */
+var maxVH = window.innerHeight;
+window.addEventListener('resize', function(){ maxVH = Math.max(maxVH, window.innerHeight); });
+function healViewport(){
+  if(maxVH - window.innerHeight > 80){   /* 视口被键盘 Bug 卡在小尺寸 */
+    var el = document.querySelector('.phone');
+    el.style.display = 'none';
+    void el.offsetHeight;                /* 强制 reflow，触发画布重测 */
+    el.style.display = '';
+    setTimeout(function(){
+      if(maxVH - window.innerHeight > 80) setTimeout(healViewport, 140);
+    }, 100);
+  }
+  fitViewport();
+}
+/* 输入框失焦（键盘收起）后触发自愈 */
+document.addEventListener('focusout', function(e){
+  var t = e.target;
+  if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')){
+    setTimeout(healViewport, 250);
+    setTimeout(function(){ window.scrollTo(0, 0); }, 350);   /* 顺带强制重绘 */
+  }
+}, true);
+/* 切回 App 时也检查一次 */
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden) setTimeout(healViewport, 300);
+});
+/* 防双击误触「隐形键盘」导致的白板（iOS 已知 Bug 的通用规避） */
+document.querySelector('.phone').addEventListener('touchstart', function(){}, {passive:true});
+
 document.getElementById('verTag').textContent = 'v0.' + APP_VER;   /* 标题旁显示版本号 */
 /* Service Worker：每次启动强制联网拿最新页面（iOS 主屏幕 App 防缓存） */
 if('serviceWorker' in navigator && location.protocol === 'https:'){
