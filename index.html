@@ -422,7 +422,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 22;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 23;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
@@ -915,6 +915,10 @@ window.addEventListener('resize', fitViewport);
 window.addEventListener('orientationchange', function(){ setTimeout(fitViewport, 100); });
 fitViewport();
 document.getElementById('verTag').textContent = 'v0.' + APP_VER;   /* 标题旁显示版本号 */
+/* Service Worker：每次启动强制联网拿最新页面（iOS 主屏幕 App 防缓存） */
+if('serviceWorker' in navigator && location.protocol === 'https:'){
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
 load();
 render();
 </script>
