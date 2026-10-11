@@ -431,7 +431,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 26;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 28;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
@@ -501,7 +501,17 @@ function getSuggestion(){
 /* ===== AI 建议（可选） =====
    Key 只存本机 localStorage，不进代码库；无配置时用本地规则。 */
 var AISTORE = 'qingqingdan.ai.v1';
-var aiCache = { sig:'', time:0, lines:null };
+/* 上一条成功的 AI 建议持久化：刷新成功前一直显示旧的（重启也不丢） */
+var aiCache = (function(){
+  try{
+    var c = JSON.parse(localStorage.getItem('qingqingdan.ai.cache.v1'));
+    if(c && Array.isArray(c.lines)) return c;
+  }catch(e){}
+  return { sig:'', lines:null, failedAt:0 };
+})();
+function saveAICache(){
+  try{ localStorage.setItem('qingqingdan.ai.cache.v1', JSON.stringify(aiCache)); }catch(e){}
+}
 var adviceToken = 0;
 
 function aiConf(){
@@ -523,22 +533,22 @@ function refreshAdvice(){
   var c = aiConf();
   if(!c || !c.url || !c.key){
     badge.style.display = 'none';
-    aiCache.lines = null;
     renderAdvice(getSuggestion(), true);   /* 未配置：本地建议 + 配置按钮 */
     return;
   }
   /* 今日无任务：不调 AI，直接本地提示 */
   if(tasks.filter(function(t){ return t.date===todayISO(); }).length === 0){
     badge.style.display = 'none';
-    aiCache.lines = null;
     renderAdvice(['今天没有安排任务，好好休息，或从底部加一条今日目标。']);
     return;
   }
-  /* 签名 = 最近一周（今起前后各7天）任务内容+状态 + 未完成总数；变化才重新请求 */
-  var win = addDays(todayISO(), -7), winEnd = addDays(todayISO(), 7);
+  /* 签名 = 今天前后各3天（含今天共7天）的任务内容+状态 + 未完成总数 + 当前小时；
+     进入 app 或范围内任务变化时会重新请求，小时变化（如进入晚间）也会触发 */
+  var win = addDays(todayISO(), -3), winEnd = addDays(todayISO(), 3);
   var sig = tasks.filter(function(t){ return t.date>=win && t.date<=winEnd; })
     .map(function(t){ return t.id+(t.done?'1':'0')+t.text+t.date; }).join('|')
-    + '#' + tasks.filter(function(t){ return !t.done; }).length;
+    + '#' + tasks.filter(function(t){ return !t.done; }).length
+    + '#' + new Date().getHours();
   if(sig === aiCache.sig && aiCache.lines){
     badge.classList.remove('loading');
     badge.textContent = 'AI'; badge.style.display = '';
@@ -548,25 +558,37 @@ function refreshAdvice(){
   /* 上次失败 1 分钟内不重试，避免连续请求 */
   if(Date.now() - (aiCache.failedAt || 0) < 60*1000){
     badge.classList.remove('loading');
-    badge.style.display = 'none';
-    renderAdvice(getSuggestion());
+    if(aiCache.lines){
+      badge.textContent = 'AI'; badge.style.display = '';
+      renderAdvice(aiCache.lines);           /* 失败冷却期：保留旧建议 */
+    } else {
+      badge.style.display = 'none';
+      renderAdvice(getSuggestion());
+    }
     return;
   }
   badge.style.display = ''; badge.textContent = '';
   badge.classList.add('loading');          /* 标题右侧转圈 */
-  renderLoading();
+  if(!aiCache.lines) renderLoading();      /* 没有旧建议才显示加载文案，否则保留旧建议 */
   fetchAISuggestion(c).then(function(lines){
     if(token !== adviceToken) return;
     aiCache = { sig:sig, lines:lines, failedAt:0 };
+    saveAICache();
     badge.classList.remove('loading');
     badge.textContent = 'AI';
     renderAdvice(lines);
   }).catch(function(){
     if(token !== adviceToken) return;
     aiCache.failedAt = Date.now();
+    saveAICache();
     badge.classList.remove('loading');
-    badge.style.display = 'none';
-    renderAdvice(getSuggestion());   /* AI 失败回退本地规则 */
+    if(aiCache.lines){
+      badge.textContent = 'AI'; badge.style.display = '';
+      renderAdvice(aiCache.lines);     /* 刷新失败：保留上一条成功的建议 */
+    } else {
+      badge.style.display = 'none';
+      renderAdvice(getSuggestion());   /* 从未成功过：回退本地规则 */
+    }
   });
 }
 function fetchAISuggestion(c){
@@ -628,7 +650,8 @@ function saveAISet(){
     return;
   }
   localStorage.setItem(AISTORE, JSON.stringify({ url:url, key:key, model:model }));
-  aiCache = { sig:'', time:0, lines:null };
+  aiCache.sig = ''; aiCache.failedAt = 0;   /* 保留旧建议展示，强制重新请求 */
+  saveAICache();
   closeAllSheets(); refreshAdvice(); toast('AI 配置已保存');
 }
 function testAI(){
@@ -659,9 +682,7 @@ function renderHome(){
   document.getElementById('homeSub').textContent =
     (new Date().getMonth()+1) + '月' + new Date().getDate() + '日 ' + weekdayCN(today);
 
-  var items = getSuggestion();
-  renderAdvice(items);
-  refreshAdvice();   /* 有 AI 配置时异步替换为 AI 建议 */
+  refreshAdvice();   /* 建议区统一由 refreshAdvice 渲染：有旧 AI 建议先显示旧的 */
 
   var pending = tasks.filter(function(t){ return !t.done; })
                      .sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
