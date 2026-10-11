@@ -228,6 +228,21 @@ body{
 }
 .composer .confirm:active{transform:scale(.95)}
 
+/* ===== 输入中（键盘弹出）的专注模式 ===== */
+/* 屏幕最底部遮条：列表滚动时不从导航栏下方缝隙里露出来 */
+@media (max-width:540px){
+  .screen::after{
+    content:""; position:absolute; left:0; right:0; bottom:0;
+    height:calc(env(safe-area-inset-bottom, 0px) + 14px);
+    background:var(--bg); z-index:34;
+  }
+}
+.dock{transition:opacity .2s, transform .25s cubic-bezier(.32,.72,.35,1)}
+/* 输入中：隐藏导航栏，输入条下沉贴到键盘上方，列表轻微退后 */
+.phone.typing .dock{opacity:0; transform:translateY(24px); pointer-events:none}
+.phone.typing .composer.show{bottom:calc(env(safe-area-inset-bottom, 0px) + 16px)}
+.phone.typing .tab-page{opacity:.45}
+
 /* ===== 底部导航栏：左对齐胶囊 + 右侧加号 ===== */
 .dock{
   position:absolute; left:14px; right:14px;
@@ -431,7 +446,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 32;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 33;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
@@ -986,6 +1001,14 @@ if(window.visualViewport){
 window.addEventListener('resize', fitViewport);
 window.addEventListener('orientationchange', function(){ setTimeout(fitViewport, 100); });
 fitViewport();
+
+/* 输入中状态（配合 CSS .typing）：键盘弹出时隐藏导航栏、输入条贴底 */
+(function(){
+  var phone = document.querySelector('.phone');
+  var input = document.getElementById('input');
+  input.addEventListener('focus', function(){ phone.classList.add('typing'); });
+  input.addEventListener('blur', function(){ phone.classList.remove('typing'); });
+})();
 
 /* ===== iOS standalone 键盘视口 Bug 自愈 =====
    键盘弹出会压缩 WebKit 视口画布，收起后画布卡在小尺寸回不去，
