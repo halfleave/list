@@ -431,7 +431,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 30;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 31;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
@@ -603,16 +603,21 @@ function parseAILines(content){
     var j = JSON.parse(s);
     if(Array.isArray(j)) lines = j.map(String);
   }catch(e){}
+  if(!lines){
+    /* JSON 被截断时解析会失败：直接提取引号里的内容，尽量保住每条建议 */
+    var m = s.match(/"((?:[^"\\]|\\.)*)"/g);
+    if(m && m.length >= 2) lines = m.map(function(x){ return x.slice(1,-1); });
+  }
   if(!lines) lines = s.split('\n');
   var out = [];
   lines.forEach(function(l){
     l = String(l).replace(/^[-·\d.、\s]+/, '').trim()
         .replace(/^["'\[]+/, '').replace(/["'\]]+$/, '').trim();
     if(!l) return;
-    if(l.length > 28){
+    if(l.length > 36){
       l.replace(/([。！？；])/g, '$1\n').split('\n').forEach(function(seg){
         seg = seg.trim();
-        if(seg) out.push(seg.slice(0, 30));
+        if(seg) out.push(seg.slice(0, 40));
       });
     } else out.push(l);
   });
@@ -645,7 +650,7 @@ function fetchAISuggestion(c){
     body: JSON.stringify({
       model: c.model || 'agnes-2.5-flash',
       messages: [ {role:'system', content:sys}, {role:'user', content:body} ],
-      max_tokens: 200, temperature: 0.6
+      max_tokens: 400, temperature: 0.6
     }),
     signal: ctrl.signal
   }).then(function(r){
