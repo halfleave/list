@@ -431,7 +431,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 29;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 30;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
@@ -593,6 +593,31 @@ function refreshAdvice(){
     }
   });
 }
+/* 解析 AI 输出：优先按 JSON 数组取，失败则按行拆；
+   超长行按句子断开，防止 AI 输出一大段 */
+function parseAILines(content){
+  var s = String(content||'').trim()
+    .replace(/^```(?:json)?/i, '').replace(/```\s*$/, '').trim();
+  var lines = null;
+  try{
+    var j = JSON.parse(s);
+    if(Array.isArray(j)) lines = j.map(String);
+  }catch(e){}
+  if(!lines) lines = s.split('\n');
+  var out = [];
+  lines.forEach(function(l){
+    l = String(l).replace(/^[-·\d.、\s]+/, '').trim()
+        .replace(/^["'\[]+/, '').replace(/["'\]]+$/, '').trim();
+    if(!l) return;
+    if(l.length > 28){
+      l.replace(/([。！？；])/g, '$1\n').split('\n').forEach(function(seg){
+        seg = seg.trim();
+        if(seg) out.push(seg.slice(0, 30));
+      });
+    } else out.push(l);
+  });
+  return out.slice(0, 3);
+}
 function fetchAISuggestion(c){
   var today = todayISO();
   /* 任务不多时全量带上（含完成状态）；超过 20 条则只发未完成的，控制 token */
@@ -600,12 +625,11 @@ function fetchAISuggestion(c){
   var list = src.map(function(t){
     return { date:t.date, text:t.text, done:!!t.done, overdue:(!t.done && t.date<today) };
   });
-  var sys = '你是用户的私人任务助手。用户打开应用时，请阅读其全部任务和完成状态，输出一份「今日建议」：'
-    + '第一行先用一句话总结今天的整体情况（共几件、完成几件、有无逾期）；'
-    + '下面再给最多2条具体行动建议。'
-    + '注意时段：如果当前时间在晚上20点以后，建议重点转向明天——帮用户为明天做准备（预告明天的任务、提醒收尾和休息）；'
-    + '20点以前则以安排今天为主。'
-    + '总共不超过3行，每行不超过25个字，直接说事、不客套，每行独占一行，不要编号和序号。';
+  var sys = '你是用户的私人任务助手，根据用户的任务和完成状态输出「今日建议」。'
+    + '严格只输出一个 JSON 数组，格式如 ["第一行","第二行","第三行"]，不要输出数组以外的任何文字、解释或 markdown。'
+    + '数组共3个元素：第1个是一句话总结今天整体情况（共几件、完成几件、有无逾期）；第2、3个是具体行动建议。'
+    + '注意时段：晚上20点后重点转向明天（预告明天任务、提醒收尾和休息），20点前以安排今天为主。'
+    + '每个元素不超过25个字，直接说事、不客套，不要编号。';
   var body = JSON.stringify({
     today:today,
     tomorrow:addDays(today,1),
@@ -629,9 +653,8 @@ function fetchAISuggestion(c){
     if(!r.ok) throw new Error('HTTP '+r.status);
     return r.json();
   }).then(function(j){
-    return (j.choices[0].message.content || '')
-      .split('\n').map(function(s){ return s.replace(/^[-·\d.、\s]+/, '').trim(); })
-      .filter(Boolean).slice(0, 3);
+    var msg = (j.choices && j.choices[0] && j.choices[0].message) || {};
+    return parseAILines(msg.content);
   });
 }
 function openAISet(){
