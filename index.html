@@ -431,7 +431,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 31;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 32;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
@@ -967,10 +967,22 @@ document.addEventListener('visibilitychange', function(){
 /* ===== 初始化 ===== */
 /* 实时跟踪可视视口高度：Safari 底栏收起/展开、键盘弹出都即时贴合 */
 function fitViewport(){
-  var h = window.visualViewport ? Math.round(visualViewport.height) : window.innerHeight;
+  var vv = window.visualViewport;
+  var h = vv ? Math.round(vv.height) : window.innerHeight;
   document.documentElement.style.setProperty('--vvh', h + 'px');
+  /* iOS 键盘弹出时会把可视视口向上平移（offsetTop>0），fixed 容器整个被顶出
+     屏幕，输入框"跑没了"。布局已经用 --vvh 收缩把输入框抬到键盘上方，
+     这个平移是多余的：用反向位移把容器拉回可视区域 */
+  var phone = document.querySelector('.phone');
+  if(vv && phone){
+    var dy = Math.round(vv.offsetTop);
+    phone.style.transform = dy > 0 ? 'translateY(' + dy + 'px)' : '';
+  }
 }
-if(window.visualViewport) visualViewport.addEventListener('resize', fitViewport);
+if(window.visualViewport){
+  visualViewport.addEventListener('resize', fitViewport);
+  visualViewport.addEventListener('scroll', fitViewport);   /* iOS 平移时即时补偿 */
+}
 window.addEventListener('resize', fitViewport);
 window.addEventListener('orientationchange', function(){ setTimeout(fitViewport, 100); });
 fitViewport();
