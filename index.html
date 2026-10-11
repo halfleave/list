@@ -431,7 +431,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 28;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 29;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
@@ -505,7 +505,7 @@ var AISTORE = 'qingqingdan.ai.v1';
 var aiCache = (function(){
   try{
     var c = JSON.parse(localStorage.getItem('qingqingdan.ai.cache.v1'));
-    if(c && Array.isArray(c.lines)) return c;
+    if(c && Array.isArray(c.lines) && c.lines.length) return c;
   }catch(e){}
   return { sig:'', lines:null, failedAt:0 };
 })();
@@ -519,6 +519,7 @@ function aiConf(){
   catch(e){ return null; }
 }
 function renderAdvice(items, showCTA){
+  if(!items || !items.length) items = getSuggestion();   /* 兜底：绝不让建议区空白 */
   var html = items.map(function(s){ return '<div class="item">'+esc(s)+'</div>'; }).join('');
   if(showCTA) html += '<button class="advice-cta" onclick="openAISet()">配置 AI，获取个性化建议</button>';
   document.getElementById('adviceBody').innerHTML = html;
@@ -572,6 +573,7 @@ function refreshAdvice(){
   if(!aiCache.lines) renderLoading();      /* 没有旧建议才显示加载文案，否则保留旧建议 */
   fetchAISuggestion(c).then(function(lines){
     if(token !== adviceToken) return;
+    if(!lines.length) throw new Error('AI 返回为空');   /* 空结果按失败处理，保留旧建议 */
     aiCache = { sig:sig, lines:lines, failedAt:0 };
     saveAICache();
     badge.classList.remove('loading');
