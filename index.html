@@ -228,7 +228,20 @@ body{
 }
 .composer .confirm:active{transform:scale(.95)}
 
-/* ===== 输入中（键盘弹出）的专注模式 ===== */
+/* ===== 输入中（键盘弹出）：毛玻璃专注层 =====
+   其他元素位置全部不动，整页蒙白色高斯模糊，输入框浮在模糊层之上 */
+.kb-blur{
+  position:absolute; inset:0; z-index:38;
+  background:rgba(255,255,255,.32);
+  backdrop-filter:blur(18px) saturate(1.3); -webkit-backdrop-filter:blur(18px) saturate(1.3);
+  opacity:0; pointer-events:none; transition:opacity .22s;
+}
+@media (prefers-color-scheme: dark){
+  .kb-blur{background:rgba(23,22,19,.38)}
+}
+.phone.typing .kb-blur{opacity:1}
+.phone.typing .composer{z-index:40}   /* 输入条始终在模糊层之上 */
+
 /* 屏幕最底部遮条：列表滚动时不从导航栏下方缝隙里露出来 */
 @media (max-width:540px){
   .screen::after{
@@ -237,11 +250,6 @@ body{
     background:var(--bg); z-index:34;
   }
 }
-.dock{transition:opacity .2s, transform .25s cubic-bezier(.32,.72,.35,1)}
-/* 输入中：隐藏导航栏，输入条下沉贴到键盘上方，列表轻微退后 */
-.phone.typing .dock{opacity:0; transform:translateY(24px); pointer-events:none}
-.phone.typing .composer.show{bottom:calc(env(safe-area-inset-bottom, 0px) + 16px)}
-.phone.typing .tab-page{opacity:.45}
 
 /* ===== 底部导航栏：左对齐胶囊 + 右侧加号 ===== */
 .dock{
@@ -379,6 +387,9 @@ body{
     <div id="calList"></div>
   </div>
 
+  <!-- 输入中毛玻璃层（键盘弹出时整页模糊） -->
+  <div class="kb-blur"></div>
+
   <!-- 底部输入条（默认隐藏） -->
   <div class="composer" id="composer">
     <input id="input" type="text" placeholder="添加任务…" enterkeyhint="done"
@@ -446,7 +457,7 @@ body{
 <script>
 'use strict';
 /* ===== 数据层：localStorage ===== */
-var APP_VER = 33;         // 每次更新代码 +1，用于线上版本缓存检查
+var APP_VER = 34;         // 每次更新代码 +1，用于线上版本缓存检查
 var STORE = 'qingqingdan.tasks.v1';
 var tasks = [];           // [{id, date:'YYYY-MM-DD', text, done}]
 var state = {
